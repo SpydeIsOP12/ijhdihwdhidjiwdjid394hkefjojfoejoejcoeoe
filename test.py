@@ -630,16 +630,22 @@ def fetch_checkout_details_from_api(pk, cs):
         }
         
         data = {
-            'key': pk,
             'eid': 'NA',
             'browser_locale': 'en-GB',
             'browser_timezone': 'Asia/Calcutta',
             'redirect_type': 'url',
         }
         
+        # Add key only if pk is provided
+        if pk:
+            data['key'] = pk
+        
         print(f"{Fore.CYAN}[*] Fetching checkout details from Stripe API...")
         print(f"{Fore.CYAN}[*] URL: {url}")
-        print(f"{Fore.CYAN}[*] PK: {pk[:30]}...")
+        if pk:
+            print(f"{Fore.CYAN}[*] PK: {pk[:30]}...")
+        else:
+            print(f"{Fore.CYAN}[*] PK: None (will extract from API response)")
         
         r = session.post(url, headers=headers, data=data, timeout=15)
         
