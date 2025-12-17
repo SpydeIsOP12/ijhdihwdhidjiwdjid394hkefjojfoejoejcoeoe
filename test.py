@@ -1111,29 +1111,37 @@ if __name__ == "__main__":
             except:
                 pass
         
-        # Fetch page and extract data
-        html = fetch_page(checkout_url)
-        if not html:
-            # Try dynamic extraction
-            dynamic_result = extract_from_dynamic_page(checkout_url)
-            if dynamic_result and dynamic_result.get('pk') and dynamic_result.get('cs'):
-                pk = dynamic_result['pk']
-                cs = dynamic_result['cs']
-                checkout_details = fetch_checkout_details_from_api(pk, cs)
+        # First, try to extract from URL (fastest method)
+        url_pk_match = re.search(r'pk_live_[a-zA-Z0-9_]+', checkout_url)
+        url_cs_match = re.search(r'cs_live_[a-zA-Z0-9_]+', checkout_url)
+        
+        if url_cs_match:
+            cs = url_cs_match.group(0)
+            print(f"Extracted cs from URL: {cs[:30]}...")
+            
+            # Try to get pk from Stripe API
+            checkout_details = fetch_checkout_details_from_api(None, cs)
+            
+            if checkout_details:
+                # Extract pk from API response
+                pk = url_pk_match.group(0) if url_pk_match else None
                 
                 result = {
                     'pk_key': pk,
-                    'sk_key': None,  # SK key extraction not implemented yet
+                    'sk_key': None,
                     'cs_token': cs,
-                    'amount': checkout_details.get('price', 'Unknown') if checkout_details else 'Unknown',
-                    'product': checkout_details.get('product', 'Unknown') if checkout_details else 'Unknown',
-                    'email': checkout_details.get('email', '') if checkout_details else ''
+                    'amount': checkout_details.get('price', 'Unknown'),
+                    'product': checkout_details.get('product', 'Unknown'),
+                    'email': checkout_details.get('email', '')
                 }
                 print(json.dumps(result))
                 sys.exit(0)
-            else:
-                print(json.dumps({'error': 'Failed to fetch checkout page'}))
-                sys.exit(1)
+        
+        # Fetch page and extract data
+        html = fetch_page(checkout_url)
+        if not html:
+            print(json.dumps({'error': 'Failed to fetch checkout page and could not extract from URL'}))
+            sys.exit(1)
         
         # Extract data
         data = extract_checkout_data(html)
