@@ -24,14 +24,26 @@ def check_card(card, proxy):
         correlationid = secrets.token_hex(16)
         r = requests.session()
         
-        # Setup proxy
+        # Setup proxy - handle format: host:port:user:pass
+        proxies = None
         if proxy:
-            proxies = {
-                'http': f'http://{proxy}',
-                'https': f'http://{proxy}'
-            }
-        else:
-            proxies = None
+            parts = proxy.split(':')
+            if len(parts) >= 2:
+                host = parts[0]
+                port = parts[1]
+                if len(parts) >= 4:
+                    # Format: host:port:user:pass
+                    user = parts[2]
+                    pwd = ':'.join(parts[3:])  # Join remaining parts as password may contain :
+                    proxy_url = f'http://{user}:{pwd}@{host}:{port}'
+                else:
+                    # Format: host:port
+                    proxy_url = f'http://{host}:{port}'
+                
+                proxies = {
+                    'http': proxy_url,
+                    'https': proxy_url
+                }
         
         phone = generate_phone()
         fake = Faker()
